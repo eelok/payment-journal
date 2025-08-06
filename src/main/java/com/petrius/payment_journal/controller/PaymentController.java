@@ -1,6 +1,7 @@
 package com.petrius.payment_journal.controller;
 
 
+import com.petrius.payment_journal.domain.MonthlySummary;
 import com.petrius.payment_journal.domain.PaymentRequest;
 import com.petrius.payment_journal.domain.PaymentResponse;
 import com.petrius.payment_journal.service.PaymentService;
@@ -33,5 +34,11 @@ public class PaymentController {
     public ResponseEntity<List<PaymentResponse>> getPaymentList(){
         List<PaymentResponse> paymentList = this.paymentService.getPaymentList();
         return ResponseEntity.status(HttpStatus.OK).body(paymentList);
+    }
+
+    @GetMapping("api/v1/payments/monthly-summary")
+    public ResponseEntity<List<MonthlySummary>> getPaymentMonthlySummary(){
+        List<MonthlySummary> monthlyPaymentSummary = this.paymentService.getMonthlyPaymentSummary();
+        return ResponseEntity.status(HttpStatus.OK).body(monthlyPaymentSummary);
     }
 }
