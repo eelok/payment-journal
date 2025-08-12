@@ -5,6 +5,7 @@ import com.petrius.payment_journal.domain.MonthlySummary;
 import com.petrius.payment_journal.domain.PaymentRequest;
 import com.petrius.payment_journal.domain.PaymentResponse;
 import com.petrius.payment_journal.entity.Payment;
+import com.petrius.payment_journal.entity.Status;
 import com.petrius.payment_journal.mapper.PaymentMapper;
 import com.petrius.payment_journal.repository.PaymentRepository;
 import org.springframework.stereotype.Service;
@@ -12,10 +13,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Service
 public class PaymentService {
@@ -64,6 +62,8 @@ public class PaymentService {
         });
 
         List<MonthlySummary> monthlySummaryList = new ArrayList<>();
+        BigDecimal expectedAmount = new BigDecimal(52000);
+
         for(Map.Entry<YearMonth, List<Payment>> entry: paymentByMonth.entrySet()){
             List<Payment> payments = entry.getValue();
 
@@ -72,15 +72,50 @@ public class PaymentService {
                     .reduce(BigDecimal.ZERO, (totalInMonth, currPayment) -> totalInMonth.add(currPayment));
 
 
-            monthlySummaryList.add(new MonthlySummary(
+
+            MonthlySummary newMonthSummery = new MonthlySummary(
                     entry.getKey(),
                     totalAmount,
                     payments.size(),
-                    payments
-            ));
+                    payments,
+                    expectedAmount,
+                    expectedAmount,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    Status.PARTIAL
+            );
+
+            monthlySummaryList.add(newMonthSummery);
         }
 
         monthlySummaryList.sort((s1, s2) -> s1.getYearMonth().compareTo(s2.getYearMonth()));
-        return  monthlySummaryList;
+        BigDecimal shouldPay = expectedAmount;
+
+        for(MonthlySummary summary: monthlySummaryList){
+            BigDecimal received = summary.getTotalAmount();
+            summary.setShouldPay(shouldPay);
+            if(received.compareTo(shouldPay) < 0){
+                BigDecimal dept = shouldPay.subtract(received);
+                shouldPay = summary.getExpectedAmount().add(dept);
+
+                summary.setDept(dept);
+                summary.setStatus(Status.DEFICIT);
+                summary.setOverpay(BigDecimal.ZERO);
+            } else if(received.compareTo(shouldPay) > 0){
+                BigDecimal overpay = received.subtract(shouldPay);
+                shouldPay = summary.getExpectedAmount().subtract(overpay);
+
+                summary.setStatus(Status.COMPLETED);
+                summary.setOverpay(overpay);
+                summary.setDept(BigDecimal.ZERO);
+            } else if(received.compareTo(shouldPay) == 0){
+                shouldPay = summary.getExpectedAmount();
+                summary.setStatus(Status.COMPLETED);
+                summary.setDept(BigDecimal.ZERO);
+                summary.setOverpay(BigDecimal.ZERO);
+            }
+
+        }
+        return monthlySummaryList;
     }
 }
